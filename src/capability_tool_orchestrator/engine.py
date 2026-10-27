@@ -37,6 +37,8 @@ class Orchestrator:
         self.registry: dict[str, Tool] = {}
 
     def register(self, tool: Tool) -> None:
+        if not tool.name or not tool.capabilities or not callable(tool.handler):
+            raise ValueError("tool needs a name, capability, and callable handler")
         if tool.name in self.registry:
             raise ValueError("duplicate tool: " + tool.name)
         self.registry[tool.name] = tool
@@ -70,7 +72,12 @@ class Orchestrator:
             for future in done:
                 tool = futures[future]
                 try:
-                    outputs[tool.name] = ToolResult(tool.name, future.result(), None)
+                    value = future.result()
+                    if not isinstance(value, dict) or any(
+                        not isinstance(key, str) for key in value
+                    ):
+                        raise TypeError("tool response must be a dict with string keys")
+                    outputs[tool.name] = ToolResult(tool.name, value, None)
                 except Exception as exc:  # noqa: BLE001 - isolate failures from untrusted tool handlers
                     outputs[tool.name] = ToolResult(
                         tool.name, None, type(exc).__name__ + ": " + str(exc)
