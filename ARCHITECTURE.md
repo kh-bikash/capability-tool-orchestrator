@@ -29,3 +29,9 @@ The application should propagate failed operations to its caller or queue so the
 3. Persist SQLite files on durable storage and back them up; migrate to a managed database for high write volume or multiple replicas.
 4. Run `pytest -q` in CI before deployment.
 5. Define workload specific evaluation cases, latency objectives, and rollback criteria before serving real users.
+
+## Execution policy
+
+The registry maps names to `Tool` records with capability sets, required scopes, priority, and a handler. A request selects only tools matching the capability and a subset of granted scopes. Eligible handlers receive copies of the payload and execute in a bounded thread pool. The overall deadline produces explicit timeout results and partial output.
+
+Merge order is deterministic: descending priority, then tool name. The first value for a key wins; different later values are reported as conflicts. Use `conflict_policy="error"` to fail a workflow instead. A timed-out Python thread cannot be forcefully terminated, so handlers must configure network timeouts and be safe if they finish after the orchestration call returns.

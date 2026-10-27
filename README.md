@@ -2,6 +2,8 @@
 
 Route a capability to permitted tools, execute them concurrently, and merge outputs with deterministic priority rules.
 
+Set `timeout_seconds` to bound orchestration latency and `conflict_policy="error"` when conflicting outputs must stop the workflow. Timed out handlers are cancelled when possible; in-flight Python threads must still implement their own I/O timeouts.
+
 ## Quick start
 
 Requires Python 3.11 or newer. From this repository:

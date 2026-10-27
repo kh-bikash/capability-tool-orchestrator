@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -40,19 +40,29 @@ class Orchestrator:
             raise ValueError("duplicate tool: " + tool.name)
         self.registry[tool.name] = tool
 
-    def execute(self, capability: str, payload: dict[str, Any], *, granted_scopes: set[str]) -> OrchestrationResult:
+    def execute(self, capability: str, payload: dict[str, Any], *, granted_scopes: set[str],
+                timeout_seconds: float = 10, conflict_policy: str = "priority") -> OrchestrationResult:
+        if timeout_seconds <= 0 or conflict_policy not in {"priority", "error"}:
+            raise ValueError("invalid timeout or conflict policy")
         eligible = [tool for tool in self.registry.values() if capability in tool.capabilities and tool.required_scopes <= granted_scopes]
         if not eligible:
             raise PermissionError("No permitted tool supports " + capability)
         outputs: dict[str, ToolResult] = {}
-        with ThreadPoolExecutor(max_workers=min(self.max_workers, len(eligible))) as pool:
+        pool = ThreadPoolExecutor(max_workers=min(self.max_workers, len(eligible)))
+        try:
             futures = {pool.submit(tool.handler, dict(payload)): tool for tool in eligible}
-            for future in as_completed(futures):
+            done, pending = wait(futures, timeout=timeout_seconds)
+            for future in done:
                 tool = futures[future]
                 try:
                     outputs[tool.name] = ToolResult(tool.name, future.result(), None)
                 except Exception as exc:
                     outputs[tool.name] = ToolResult(tool.name, None, type(exc).__name__ + ": " + str(exc))
+            for future in pending:
+                future.cancel()
+                outputs[futures[future].name] = ToolResult(futures[future].name, None, "TimeoutError: tool deadline exceeded")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
         ordered = sorted(eligible, key=lambda t: (-t.priority, t.name))
         merged: dict[str, Any] = {}
         conflicts: list[str] = []
@@ -65,4 +75,6 @@ class Orchestrator:
                     conflicts.append(key)
                 else:
                     merged[key] = value
+        if conflicts and conflict_policy == "error":
+            raise ValueError("Conflicting tool outputs: " + ", ".join(sorted(set(conflicts))))
         return OrchestrationResult(merged, tuple(outputs[t.name] for t in ordered), tuple(sorted(set(conflicts))))
