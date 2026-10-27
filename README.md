@@ -15,6 +15,15 @@ python -m pip install -e '.[dev]'
 pytest -q
 ```
 
+On macOS or Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+pytest -q
+```
+
 This project uses deterministic tests and needs no model key for verification.
 
 ```python
