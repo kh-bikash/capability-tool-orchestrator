@@ -36,6 +36,23 @@ print(orchestrator.execute("lookup", {"id": "42"}, granted_scopes={"read"}))
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    Request[Capability request] --> Scope[Scope and capability filter]
+    Registry[Dynamic tool registry] --> Scope
+    Scope --> Pool[Bounded parallel executor]
+    Pool --> Results[Per tool result or timeout]
+    Results --> Merge[Priority ordered merge]
+    Merge --> Output[Merged result and conflicts]
+    Merge -->|Strict conflict policy| Failure[Conflict error]
+```
+
+| Component | Responsibility |
+|---|---|
+| Registry | Maps tools to capabilities, scopes, and priority. |
+| Executor | Runs eligible tools concurrently with an overall deadline. |
+| Merger | Resolves values deterministically and reports conflicts. |
+
 Capability request -> scope filter -> bounded thread pool -> per-tool result capture -> priority ordered merge -> conflict list.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for components, state, failure behavior, and operations.
