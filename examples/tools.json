@@ -1,0 +1,4 @@
+[
+  {"name":"catalog","kind":"static","capabilities":["lookup"],"scopes":["read"],"priority":10,"value":{"source":"catalog","available":true}},
+  {"name":"inventory","kind":"static","capabilities":["lookup"],"scopes":["read"],"priority":5,"value":{"stock":12}}
+]

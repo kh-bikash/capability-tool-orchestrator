@@ -44,3 +44,17 @@ def test_deadline_returns_partial_results():
     result = orch.execute("work", {}, granted_scopes=set(), timeout_seconds=0.05)
     assert result.merged == {"ok": True}
     assert any(r.error and "TimeoutError" in r.error for r in result.results)
+
+
+def test_invalid_tool_output_is_isolated():
+    orch = Orchestrator()
+    orch.register(Tool("bad", frozenset({"lookup"}), frozenset(), lambda _: [1]))
+    orch.register(
+        Tool("good", frozenset({"lookup"}), frozenset(), lambda _: {"ok": True})
+    )
+    result = orch.execute("lookup", {}, granted_scopes=set())
+    assert result.merged == {"ok": True}
+    assert (
+        result.results[0].error
+        == "TypeError: tool response must be a dict with string keys"
+    )

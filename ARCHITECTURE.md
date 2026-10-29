@@ -26,7 +26,7 @@ The application should propagate failed operations to its caller or queue so the
 
 1. Set secrets through a secret manager and rotate them regularly.
 2. Put the service or integrating application behind TLS and authentication.
-3. Persist SQLite files on durable storage and back them up; migrate to a managed database for high write volume or multiple replicas.
+3. The registry is process local. Load trusted tool definitions at startup and keep side effects and idempotency in each handler.
 4. Run `pytest -q` in CI before deployment.
 5. Define workload specific evaluation cases, latency objectives, and rollback criteria before serving real users.
 
@@ -34,4 +34,10 @@ The application should propagate failed operations to its caller or queue so the
 
 The registry maps names to `Tool` records with capability sets, required scopes, priority, and a handler. A request selects only tools matching the capability and a subset of granted scopes. Eligible handlers receive copies of the payload and execute in a bounded thread pool. The overall deadline produces explicit timeout results and partial output.
 
+Registration rejects unnamed tools, empty capability sets, non-callable handlers, and duplicate names. A handler must return a dictionary with string keys. Invalid responses and handler exceptions become per-tool errors so another permitted tool can still provide a partial result.
+
 Merge order is deterministic: descending priority, then tool name. The first value for a key wins; different later values are reported as conflicts. Use `conflict_policy="error"` to fail a workflow instead. A timed-out Python thread cannot be forcefully terminated, so handlers must configure network timeouts and be safe if they finish after the orchestration call returns.
+
+## Product interfaces and trust boundary
+
+The installed console command and local browser call the same product operation in `src/*/__main__.py`; the browser does not replace the engine's validation or state transitions. `src/*/web.py` serves HTML and a JSON action endpoint with a one-megabyte request limit and a per-process CSRF token. It binds to loopback by default. A non-loopback bind requires `AGENT_WEB_TOKEN` of at least 16 characters, checked on every action request. The page never embeds the access token; an operator enters it in the browser. Treat the browser as an operator interface and place TLS plus identity-aware access control in front of any public endpoint. The non-root container is described in `DEPLOYMENT.md`.

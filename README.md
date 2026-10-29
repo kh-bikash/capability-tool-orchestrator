@@ -1,8 +1,17 @@
 # Capability Tool Orchestrator
 
-Route a capability to permitted tools, execute them concurrently, and merge outputs with deterministic priority rules.
+## About
 
-Set `timeout_seconds` to bound orchestration latency and `conflict_policy="error"` when conflicting outputs must stop the workflow. Timed out handlers are cancelled when possible; in-flight Python threads must still implement their own I/O timeouts.
+When one request needs information from several services, this app coordinates the calls. You describe tools in a manifest, say what each tool can do and which permission scope it needs, then request a capability. The orchestrator runs the matching permitted tools together and combines their results in a predictable order. If two tools disagree, it reports the conflict instead of hiding it.
+
+### What you can do
+
+- Register static data sources or HTTPS endpoints as tools.
+- Grant only the scopes a caller is allowed to use.
+- Run eligible tools in parallel with an overall deadline.
+- Choose whether conflicting values should be reported or stop the workflow.
+
+Use it from the CLI, local browser, or Python library. It does not require an AI model for its core workflow. It is currently a locally run product; there is no public hosted URL. Individual HTTP tools still need their own network timeouts and trusted endpoint configuration.
 
 ## Quick start
 
@@ -26,6 +35,8 @@ pytest -q
 
 This project uses deterministic tests and needs no model key for verification.
 
+The installed `tool-orchestrator` command runs a manifest of scoped tools. Try `tool-orchestrator --manifest examples/tools.json run lookup '{"item":"42"}' --scope read`. The JSON manifest supports `static` tools and `http` tools that POST the payload to an HTTPS endpoint (or loopback in development); set `bearer_env` to an environment variable name for an endpoint token. Run `tool-orchestrator --manifest examples/tools.json serve --port 8080` for the local browser interface at `http://127.0.0.1:8080`. Only grant scopes a caller is authorized to use.
+
 ```python
 from capability_tool_orchestrator.engine import Orchestrator, Tool
 
@@ -38,6 +49,8 @@ print(orchestrator.execute("lookup", {"id": "42"}, granted_scopes={"read"}))
 
 ```mermaid
 flowchart LR
+    CLI[Command line] --> Request
+    Browser[Browser interface] --> Request
     Request[Capability request] --> Scope[Scope and capability filter]
     Registry[Dynamic tool registry] --> Scope
     Scope --> Pool[Bounded parallel executor]
@@ -58,6 +71,8 @@ Capability request -> scope filter -> bounded thread pool -> per-tool result cap
 See [ARCHITECTURE.md](ARCHITECTURE.md) for components, state, failure behavior, and operations.
 
 ## Deployment and safety
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the non-root container, token-protected browser, data mounts, and release checks.
 
 The orchestrator does not cancel slow Python threads. Set timeouts in individual handlers. Conflicting values keep the highest priority tool's value and are listed for caller review.
 
