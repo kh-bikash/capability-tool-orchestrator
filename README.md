@@ -1,8 +1,17 @@
 # Capability Tool Orchestrator
 
-Route a capability to permitted tools, execute them concurrently, and merge outputs with deterministic priority rules.
+## About
 
-Set `timeout_seconds` to bound orchestration latency and `conflict_policy="error"` when conflicting outputs must stop the workflow. Timed out handlers are cancelled when possible; in-flight Python threads must still implement their own I/O timeouts.
+When one request needs information from several services, this app coordinates the calls. You describe tools in a manifest, say what each tool can do and which permission scope it needs, then request a capability. The orchestrator runs the matching permitted tools together and combines their results in a predictable order. If two tools disagree, it reports the conflict instead of hiding it.
+
+### What you can do
+
+- Register static data sources or HTTPS endpoints as tools.
+- Grant only the scopes a caller is allowed to use.
+- Run eligible tools in parallel with an overall deadline.
+- Choose whether conflicting values should be reported or stop the workflow.
+
+Use it from the CLI, local browser, or Python library. It does not require an AI model for its core workflow. It is currently a locally run product; there is no public hosted URL. Individual HTTP tools still need their own network timeouts and trusted endpoint configuration.
 
 ## Quick start
 
