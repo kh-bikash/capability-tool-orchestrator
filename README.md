@@ -82,6 +82,44 @@ Install this as a library in an authenticated application or worker. Register tr
 
 `pytest -q` runs deterministic tests. GitHub Actions runs the same suite on pushes and pull requests.
 
+## Product guide
+
+### Build a tool registry
+
+The manifest tells the orchestrator which tools exist, which capability each serves, which scopes permit it, and how to call it. `examples/tools.json` is a starting point. A `static` tool returns configured JSON; an `http` tool sends the request payload to an HTTPS endpoint and can read a bearer token from an environment variable. Use endpoint URLs and tokens owned by your application, not values supplied by an untrusted browser user.
+
+```bash
+tool-orchestrator --manifest examples/tools.json run lookup '{"item":"42"}' --scope read
+```
+
+This asks for the `lookup` capability using the `read` scope. Only matching tools run. The result includes their responses, a merged value, and any conflicts. For an operator form, replace `run ...` with `serve --port 8080` using the same manifest.
+
+### Execution and conflict rules
+
+| Stage | Behavior |
+|---|---|
+| Selection | Capability and granted scopes filter the registry before execution. |
+| Parallel work | Eligible handlers run in a bounded thread pool under an overall deadline. |
+| Merge | Higher-priority tool values win deterministically. |
+| Conflict report | Disagreeing values are listed; `conflict_policy="error"` can stop the workflow. |
+
+An overall timeout prevents the caller from waiting indefinitely, but Python threads already inside blocking I/O cannot be forcibly stopped. Configure a shorter timeout in every HTTP handler and design side effects to be idempotent. This orchestrator handles coordination; it does not authenticate browser users or decide which scopes they deserve.
+
+### Integration and operations
+
+The Python library accepts registered `Tool` objects, so you can connect existing internal services without using a JSON manifest. The CLI and browser are useful for operators and testing. No model API key is needed for the orchestration itself. Keep bearer tokens in environment variables; never place their values in the manifest. Run the deterministic test suite after changing merge policy or tool registration. Review [ARCHITECTURE.md](ARCHITECTURE.md) for the registry and executor design and [DEPLOYMENT.md](DEPLOYMENT.md) for the local container and access boundary.
+
+### Common issues
+
+| Symptom | Check |
+|---|---|
+| No tools run | Confirm the requested capability exists and the caller received the needed scope. |
+| An HTTP tool fails | Check its HTTPS endpoint, token environment variable, response JSON, and handler timeout. |
+| The result contains conflicts | Review the per-tool values and priority order; use strict conflict policy if disagreement must fail. |
+| A call times out | Lower the timeout inside the slow handler or reduce fan-out; a timed-out Python thread may still be finishing I/O. |
+
+Do not let a browser form invent permission scopes for real users. An authenticated host application must derive granted scopes from its own access policy.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
